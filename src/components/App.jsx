@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import css from './App.module.css';
@@ -8,66 +8,74 @@ import ImageGallery from './ImageGallery';
 import Button from './Button';
 import api from '../services/api';
 
-export default class App extends Component {
-  state = {
+export default function App() {
+  const [state, setState] = useState({
     searchQuery: '',
     pendingRequest: false,
     page: 1,
     picturesSet: [],
     searchMatches: 0,
     totalHits: 0,
-  };
+  });
 
-  componentDidUpdate(prevProps, prevState) {
-    const { searchQuery, page } = this.state;
-    if (prevState.searchQuery !== searchQuery || prevState.page !== page) {
-      this.setState({ pendingRequest: true });
-      api(searchQuery, page)
-        .then(pictures => {
-          this.setState(
-            prevState => ({
-              pendingRequest: false,
-              picturesSet: [...prevState.picturesSet, ...pictures.hits],
-              searchMatches: prevState.searchMatches + pictures.hits.length,
-              totalHits: pictures.totalHits,
-            }),
-            () => {
-              console.log(
-                `we have loaded ${this.state.searchMatches} out of ${this.state.totalHits} totally found`
-              );
-              this.handleSearchNotifications();
-            }
+  const {
+    searchQuery,
+    pendingRequest,
+    page,
+    picturesSet,
+    searchMatches,
+    totalHits,
+  } = state;
+
+  useEffect(() => {
+    if (!searchQuery) {
+      return;
+    }
+    setState(prevState => ({ ...prevState, pendingRequest: true }));
+    api(searchQuery, page)
+      .then(pictures => {
+        setState(prevState => ({
+          ...prevState,
+          pendingRequest: false,
+          picturesSet: [...prevState.picturesSet, ...pictures.hits],
+          searchMatches: prevState.searchMatches + pictures.hits.length,
+          totalHits: pictures.totalHits,
+        }));
+        setState(prevState => {
+          console.log(
+            `we have loaded ${prevState.searchMatches} out of ${prevState.totalHits} totally found`
           );
-        })
-        .catch(error => this.handleError(error));
-    }
-  }
+          if (prevState.totalHits > 0 && prevState.page === 1) {
+            toast.success(`Hooray! We found ${prevState.totalHits} images`, {
+              position: 'top-right',
+              theme: 'colored',
+            });
+          } else if (
+            prevState.searchMatches === prevState.totalHits &&
+            prevState.totalHits > 0
+          ) {
+            toast.info("You've reached the end of search results.", {
+              position: 'top-right',
+              theme: 'colored',
+            });
+          } else if (prevState.totalHits === 0) {
+            toast.warn(
+              'No pictures were found for your query, please try another one!',
+              {
+                position: 'top-right',
+                theme: 'colored',
+              }
+            );
+          }
+          return prevState;
+        });
+      })
+      .catch(error => handleError(error))
+      .finally();
+  }, [searchQuery, page]);
 
-  handleSearchNotifications = () => {
-    const { page, searchMatches, totalHits } = this.state;
-    if (totalHits > 0 && page === 1) {
-      toast.success(`Hooray! We found ${totalHits} images`, {
-        position: 'top-right',
-        theme: 'colored',
-      });
-    } else if (searchMatches === totalHits && totalHits > 0) {
-      toast.info("You've reached the end of search results.", {
-        position: 'top-right',
-        theme: 'colored',
-      });
-    } else if (totalHits === 0) {
-      toast.warn(
-        'No pictures were found for your query, please try another one!',
-        {
-          position: 'top-right',
-          theme: 'colored',
-        }
-      );
-    }
-  };
-
-  handleError = error => {
-    this.setState({ pendingRequest: false });
+  const handleError = error => {
+    setState(prevState => ({ ...prevState, pendingRequest: false }));
     console.log('An error occurred: ', error.message);
     toast.error(`An error occurred: ${error.message}`, {
       position: 'top-right',
@@ -75,8 +83,7 @@ export default class App extends Component {
     });
   };
 
-  handleQuery = query => {
-    const { searchQuery } = this.state;
+  const handleQuery = query => {
     if (query === searchQuery) {
       toast.warn(
         `You are searching through the collection for "${query}" already!`,
@@ -86,40 +93,33 @@ export default class App extends Component {
         }
       );
     }
-    this.setState({
+    setState(prevState => ({
+      ...prevState,
       searchQuery: query,
       page: 1,
       picturesSet: [],
       searchMatches: 0,
       totalHits: 0,
-    });
-  };
-
-  loadMorePictures = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
     }));
   };
 
-  render() {
-    const { pendingRequest, picturesSet, searchMatches, totalHits } =
-      this.state;
-    return (
-      <div className={css.App}>
-        <Searchbar onSubmit={this.handleQuery} />
-        {picturesSet.length > 0 && <ImageGallery pictures={picturesSet} />}
-        {pendingRequest && <Loader />}
-        {searchMatches < totalHits && (
-          <Button onClick={this.loadMorePictures} />
-        )}
+  const loadMorePictures = () => {
+    setState(prevState => ({ ...prevState, page: prevState.page + 1 }));
+  };
 
-        <ToastContainer
-          autoClose={3000}
-          hideProgressBar={false}
-          closeOnClick
-          pauseOnHover
-        />
-      </div>
-    );
-  }
+  return (
+    <div className={css.App}>
+      <Searchbar onSubmit={handleQuery} />
+      {picturesSet.length > 0 && <ImageGallery pictures={picturesSet} />}
+      {pendingRequest && <Loader />}
+      {searchMatches < totalHits && <Button onClick={loadMorePictures} />}
+
+      <ToastContainer
+        autoClose={3000}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover
+      />
+    </div>
+  );
 }
