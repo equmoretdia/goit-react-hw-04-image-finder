@@ -84,6 +84,14 @@ export default function App() {
   };
 
   const handleQuery = query => {
+    setState(prevState => ({
+      ...prevState,
+      searchQuery: query,
+      page: 1,
+      picturesSet: [],
+      searchMatches: 0,
+      totalHits: 0,
+    }));
     if (query === searchQuery) {
       toast.warn(
         `You are searching through the collection for "${query}" already!`,
@@ -93,14 +101,6 @@ export default function App() {
         }
       );
     }
-    setState(prevState => ({
-      ...prevState,
-      searchQuery: query,
-      page: 1,
-      picturesSet: [],
-      searchMatches: 0,
-      totalHits: 0,
-    }));
   };
 
   const loadMorePictures = () => {
